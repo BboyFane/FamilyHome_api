@@ -1,4 +1,3 @@
-node_modules/
-*.env
-*.wav
-*.mp3
+node_modules
+ibm-credentials.env
+.env

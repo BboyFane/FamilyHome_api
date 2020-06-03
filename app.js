@@ -1,10 +1,12 @@
-var SpeechToTextV1 = require('watson-developer-cloud/speech-to-text/v1');
-const TextToSpeechV1 = require('ibm-watson/text-to-speech/v1');
-const AssistantV1 = require('ibm-watson/assistant/v1');
+var   SpeechToTextV1       = require('watson-developer-cloud/speech-to-text/v1');
+const TextToSpeechV1       = require('ibm-watson/text-to-speech/v1');
+const AssistantV1          = require('ibm-watson/assistant/v1');
+const AssistantV2          = require('ibm-watson/assistant/v2');
 const { IamAuthenticator } = require('ibm-watson/auth');
-var fs = require('fs');
-const upload = require("express-fileupload")
-const express = require('express');
+var   fs                   = require('fs');
+const upload               = require("express-fileupload")
+const express              = require('express');
+
 require('dotenv').config();
 
 const app = express();
@@ -12,12 +14,62 @@ app.use(upload())
 
 app.listen(8000);
 
-app.post('/test', function (req, res) {
-    const assistant = new AssistantV1({
-    authenticator: new IamAuthenticator({ apikey: process.env.ASSISTANT_IAM_APIKEY }),
-     url : process.env.URL,
-      version: '2018-02-16'
+app.post('/deleteSessionId', function (req, res){
+
+  const assistant = new AssistantV2({
+    version      : '2020-04-01',
+    authenticator: new IamAuthenticator({
+      apikey: process.env.ASSISTANT_IAM_APIKEY,
+    }),
+    url: process.env.URL,
+  });
+
+  console.log(req.body.session_id)
+
+  assistant.deleteSession({
+    assistantId: process.env.ASSISTANT_ID,
+    sessionId  : req.body.session_id,
+  })
+    .then(res => {
+      console.log(JSON.stringify(res.result, null, 2));
+    })
+    .catch(err => {
+      console.log(err);
     });
+})
+
+app.post('/createSessionId', function (req, res){
+
+  const assistant = new AssistantV2({
+    version      : '2020-04-01',
+    authenticator: new IamAuthenticator({
+      apikey: process.env.ASSISTANT_IAM_APIKEY,
+    }),
+    url: process.env.URL,
+  });
+
+  assistant.createSession({
+    assistantId: process.env.ASSISTANT_ID
+  })
+    .then(res => {
+      console.log(JSON.stringify(res.result, null, 2));
+    })
+    .catch(err => {
+      console.log(err);
+    });
+})
+
+app.post('/sendMessage', function (req, res) {
+  const assistant = new AssistantV2({
+    authenticator: new IamAuthenticator({ apikey: process.env.ASSISTANT_IAM_APIKEY }),
+    url          : process.env.URL,
+    version      : '2018-09-19'
+  });
+    // const assistant = new AssistantV1({
+    // authenticator: new IamAuthenticator({ apikey: process.env.ASSISTANT_IAM_APIKEY }),
+    //  url : process.env.URL,
+    //   version: '2018-07-10'
+    // });
 
     let audio = req.files.audioFile.name;
 
@@ -27,9 +79,9 @@ app.post('/test', function (req, res) {
     });
 
     var params = {
-      audio: fs.createReadStream(audio),
+      audio       : fs.createReadStream(audio),
       content_type: 'audio/mp3',
-      'model': 'fr-FR_BroadbandModel',
+      'model'     : 'fr-FR_BroadbandModel',
     };
 
     function test(){
@@ -38,15 +90,35 @@ app.post('/test', function (req, res) {
 
   test().then(result => {
     assistant.message(
-            {input: { text: result.results[0].alternatives[0].transcript },workspaceId: '8bf6678c-f2dc-462c-ab4b-0dcfb802c550'})
+            {input: { text: result.results[0].alternatives[0].transcript },
+            workspaceId: process.env.ASSISTANT_WORKSPACE_ID,
+            assistantId: ASSISTANT_ID,
+            sessionId  : res.body.session_id})
             .then(response => {
 
               const textToSpeech = new TextToSpeechV1({
               });
+
+              var str = "";
+            response.result.output.generic.forEach(element => {
+            if (element.response_type === 'text'){
+              console.log(element.text);
+              str += '\n' + element.text;
+            }
+            else if (element.response_type === 'option'){
+              console.log(element.title)
+              str += '\n' + element.title;
+              element.options.forEach(element =>{
+                str += '\n' + element.label;
+                console.log(element.label);
+              })
+            }
+          });
               
               const params = {
-                text: response.result.output.text[0],
-                voice: 'fr-FR_ReneeVoice',
+                // text: response.result.output.text[0],
+                text  : str,
+                voice : 'fr-FR_ReneeVoice',
                 accept: 'audio/wav'
               };
 
@@ -64,7 +136,18 @@ app.post('/test', function (req, res) {
                 console.log(err);
               });
 
-              console.log(response.result.output.text[0]);
+          //    console.log(response.result.output.textl[0]);
+          // response.result.output.generic.forEach(element => {
+          //   if (element.response_type === 'text')
+          //     console.log(element.text);
+          //   else if (element.response_type === 'option'){
+          //     console.log(element.title)
+          //     element.options.forEach(element =>{
+          //       console.log(element.label);
+          //     })
+          //   }
+          // });
+          console.log(response);
               res.status(200).json(response.result.output.text[0])
               return JSON.stringify(response.result, null, 2)
             })
@@ -85,9 +168,9 @@ app.post('/uploadAudio', function (req, res) {
   });
 
   var params = {
-    audio: fs.createReadStream(audio),
+    audio       : fs.createReadStream(audio),
     content_type: 'audio/mp3',
-    'model': 'fr-FR_BroadbandModel',
+    'model'     : 'fr-FR_BroadbandModel',
   };
 
   function test(){
@@ -110,8 +193,8 @@ app.post('/uploadText', function(req, res){
   });
   
   const params = {
-    text: text,
-    voice: 'fr-FR_ReneeVoice',
+    text  : text,
+    voice : 'fr-FR_ReneeVoice',
     accept: 'audio/wav'
   };
 
