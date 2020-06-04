@@ -12,7 +12,9 @@ require('dotenv').config();
 const app = express();
 app.use(upload())
 
-app.listen(8000);
+app.listen(8000, function (){
+  console.log("Listening port 8000");
+});
 
 app.post('/deleteSessionId', function (req, res){
 
@@ -30,8 +32,9 @@ app.post('/deleteSessionId', function (req, res){
     assistantId: process.env.ASSISTANT_ID,
     sessionId  : req.body.session_id,
   })
-    .then(res => {
-      console.log(JSON.stringify(res.result, null, 2));
+    .then(response => {
+      console.log(JSON.stringify(response.result, null, 2));
+      res.status(200).json(response.result);
     })
     .catch(err => {
       console.log(err);
@@ -51,8 +54,9 @@ app.post('/createSessionId', function (req, res){
   assistant.createSession({
     assistantId: process.env.ASSISTANT_ID
   })
-    .then(res => {
-      console.log(JSON.stringify(res.result, null, 2));
+    .then(response => {
+      console.log(JSON.stringify(response.result, null, 2));
+      res.status(200).json(response.result);
     })
     .catch(err => {
       console.log(err);
@@ -65,11 +69,6 @@ app.post('/sendMessage', function (req, res) {
     url          : process.env.URL,
     version      : '2018-09-19'
   });
-    // const assistant = new AssistantV1({
-    // authenticator: new IamAuthenticator({ apikey: process.env.ASSISTANT_IAM_APIKEY }),
-    //  url : process.env.URL,
-    //   version: '2018-07-10'
-    // });
 
     let audio = req.files.audioFile.name;
 
@@ -92,8 +91,8 @@ app.post('/sendMessage', function (req, res) {
     assistant.message(
             {input: { text: result.results[0].alternatives[0].transcript },
             workspaceId: process.env.ASSISTANT_WORKSPACE_ID,
-            assistantId: ASSISTANT_ID,
-            sessionId  : res.body.session_id})
+            assistantId: process.env.ASSISTANT_ID,
+            sessionId  : req.body.session_id})
             .then(response => {
 
               const textToSpeech = new TextToSpeechV1({
@@ -136,17 +135,6 @@ app.post('/sendMessage', function (req, res) {
                 console.log(err);
               });
 
-          //    console.log(response.result.output.textl[0]);
-          // response.result.output.generic.forEach(element => {
-          //   if (element.response_type === 'text')
-          //     console.log(element.text);
-          //   else if (element.response_type === 'option'){
-          //     console.log(element.title)
-          //     element.options.forEach(element =>{
-          //       console.log(element.label);
-          //     })
-          //   }
-          // });
           console.log(response);
               res.status(200).json(response.result.output.text[0])
               return JSON.stringify(response.result, null, 2)
